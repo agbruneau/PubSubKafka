@@ -1,0 +1,144 @@
+# ==============================================================================
+# PubSubKafka - Configuration Production
+# ==============================================================================
+# Configuration optimisée pour l'environnement de production.
+# 
+# ⚠️  ATTENTION: Les secrets doivent être injectés via variables d'environnement
+#     ou un gestionnaire de secrets (Vault, AWS Secrets Manager, etc.)
+
+# Version de la configuration
+version: "1.0"
+environment: "production"
+
+# ==============================================================================
+# Configuration Kafka
+# ==============================================================================
+kafka:
+  # Cluster multi-brokers pour haute disponibilité
+  broker: "${KAFKA_BROKERS:kafka-1.prod.internal:9092,kafka-2.prod.internal:9092,kafka-3.prod.internal:9092}"
+  
+  topics:
+    orders: "orders"
+    orders_dlq: "orders-dlq"
+    users: "users"
+    users_dlq: "users-dlq"
+  
+  producer:
+    acks: "all"                     # Attendre tous les réplicas
+    retries: 5                       # Plus de tentatives en prod
+    batch_size: 32768                # Batch plus grand pour performance
+    linger_ms: 10                    # Petit délai pour batching
+    compression_type: "lz4"          # LZ4 pour meilleur compromis perf/taille
+    enable_idempotence: true
+    message_interval: "100ms"        # Production plus rapide
+    flush_timeout: "30s"
+  
+  consumer:
+    group_id: "order-tracker-prod"
+    auto_offset_reset: "earliest"
+    enable_auto_commit: false
+    auto_commit_interval: "5s"
+    session_timeout: "45s"
+    heartbeat_interval: "10s"
+    max_poll_records: 1000
+    read_timeout: "5s"
+
+# ==============================================================================
+# Configuration DLQ
+# ==============================================================================
+dlq:
+  topic: "orders-dlq"
+  max_retries: 5
+  retry_base_delay: "2s"
+  retry_max_delay: "60s"
+  flush_timeout: "10s"
+
+# ==============================================================================
+# Configuration du Monitoring
+# ==============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+  
+  tracing:
+    enabled: true
+    exporter: "otlp"
+    endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT:https://otel-collector.prod.internal:4318}"
+    sample_rate: 0.01               # 1% en production pour limiter le volume
+  
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
+
+# ==============================================================================
+# Configuration du Serveur HTTP
+# ==============================================================================
+http:
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  shutdown_timeout: "30s"
+  
+  health:
+    enabled: true
+    path: "/health"
+  
+  ready:
+    enabled: true
+    path: "/ready"
+
+# ==============================================================================
+# Configuration de la Base de Données
+# ==============================================================================
+database:
+  driver: "postgres"
+  host: "${DB_HOST:postgres-primary.prod.internal}"
+  port: 5432
+  name: "kafka_events_prod"
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+  ssl_mode: "verify-full"
+  max_open_conns: 50
+  max_idle_conns: 10
+  conn_max_lifetime: "10m"
+
+# ==============================================================================
+# Configuration de Sécurité
+# ==============================================================================
+security:
+  sasl:
+    enabled: true
+    mechanism: "SCRAM-SHA-512"
+    username: "${KAFKA_USERNAME}"
+    password: "${KAFKA_PASSWORD}"
+  
+  tls:
+    enabled: true
+    ca_file: "/etc/ssl/certs/kafka-ca.crt"
+    cert_file: "/etc/ssl/certs/kafka-client.crt"
+    key_file: "/etc/ssl/private/kafka-client.key"
+    skip_verify: false
+
+# ==============================================================================
+# Configuration Avancée
+# ==============================================================================
+advanced:
+  # Limites de ressources
+  resources:
+    max_memory_mb: 512
+    max_cpu_percent: 80
+  
+  # Circuit breaker
+  circuit_breaker:
+    enabled: true
+    threshold: 5
+    timeout: "30s"
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_second: 1000
+    burst: 100

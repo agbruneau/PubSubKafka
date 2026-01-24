@@ -1,0 +1,31 @@
+# Kafka logs and events
+tracker.log
+tracker.events
+*.log
+*.events
+
+# Go Binaries and Executables
+producer
+tracker
+monitor
+log_monitor
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Process ID files
+*.pid
+
+# Go testing and production artifacts
+*.test
+*.out
+vendor/
+.DS_Store
+
+# IDE and temporary files
+.vscode/
+.idea/
+*.swp
+*.swo

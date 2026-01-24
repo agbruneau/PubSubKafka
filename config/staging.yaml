@@ -1,0 +1,89 @@
+# ==============================================================================
+# PubSubKafka - Configuration Staging
+# ==============================================================================
+# Configuration pour l'environnement de pré-production.
+
+# Version de la configuration
+version: "1.0"
+environment: "staging"
+
+# ==============================================================================
+# Configuration Kafka
+# ==============================================================================
+kafka:
+  broker: "${KAFKA_BROKER:kafka-staging.internal:9092}"
+  
+  producer:
+    acks: "all"
+    retries: 3
+    compression_type: "snappy"
+    enable_idempotence: true
+    message_interval: "1s"
+  
+  consumer:
+    group_id: "order-tracker-staging"
+    auto_offset_reset: "earliest"
+    enable_auto_commit: false
+
+# ==============================================================================
+# Configuration DLQ
+# ==============================================================================
+dlq:
+  max_retries: 3
+  retry_base_delay: "1s"
+  retry_max_delay: "30s"
+
+# ==============================================================================
+# Configuration du Monitoring
+# ==============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+  
+  tracing:
+    enabled: true
+    exporter: "jaeger"
+    endpoint: "${JAEGER_ENDPOINT:http://jaeger-staging.internal:14268/api/traces}"
+    sample_rate: 0.1
+  
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
+
+# ==============================================================================
+# Configuration du Serveur HTTP
+# ==============================================================================
+http:
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+
+# ==============================================================================
+# Configuration de la Base de Données
+# ==============================================================================
+database:
+  host: "${DB_HOST:postgres-staging.internal}"
+  port: 5432
+  name: "kafka_events_staging"
+  user: "${DB_USER:kafka_app}"
+  password: "${DB_PASSWORD}"
+  ssl_mode: "require"
+  max_open_conns: 15
+  max_idle_conns: 5
+
+# ==============================================================================
+# Configuration de Sécurité
+# ==============================================================================
+security:
+  sasl:
+    enabled: true
+    mechanism: "SCRAM-SHA-256"
+    username: "${KAFKA_USERNAME}"
+    password: "${KAFKA_PASSWORD}"
+  
+  tls:
+    enabled: true
+    ca_file: "/etc/ssl/certs/kafka-ca.crt"
+    skip_verify: false

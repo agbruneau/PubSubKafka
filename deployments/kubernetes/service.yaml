@@ -1,0 +1,100 @@
+# ==============================================================================
+# PubSubKafka - Kubernetes Services
+# ==============================================================================
+# Services pour exposer les pods producer et consumer.
+#
+# Usage:
+#   kubectl apply -f service.yaml
+#   kubectl get services -l app=kafka-demo
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-producer
+  namespace: default
+  labels:
+    app: kafka-demo
+    component: producer
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: kafka-demo
+    component: producer
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-consumer
+  namespace: default
+  labels:
+    app: kafka-demo
+    component: consumer
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: kafka-demo
+    component: consumer
+
+---
+
+# Service headless pour le consumer (utile pour les StatefulSets)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-consumer-headless
+  namespace: default
+  labels:
+    app: kafka-demo
+    component: consumer
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: kafka-demo
+    component: consumer
+
+---
+
+# Service externe pour accès depuis l'extérieur du cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-consumer-external
+  namespace: default
+  labels:
+    app: kafka-demo
+    component: consumer
+  annotations:
+    # Pour les cloud providers supportant les load balancers
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: kafka-demo
+    component: consumer

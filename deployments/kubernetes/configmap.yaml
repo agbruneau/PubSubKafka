@@ -1,0 +1,248 @@
+# ==============================================================================
+# PubSubKafka - Kubernetes ConfigMap
+# ==============================================================================
+# Configuration centralisée pour les services Kafka.
+#
+# Usage:
+#   kubectl apply -f configmap.yaml
+#   kubectl describe configmap kafka-demo-config
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-demo-config
+  namespace: default
+  labels:
+    app: kafka-demo
+data:
+  # Configuration Kafka
+  kafka.broker: "kafka-broker.kafka.svc.cluster.local:9092"
+  kafka.topic: "orders"
+  kafka.topic.dlq: "orders-dlq"
+  kafka.consumer.group: "order-tracker-group"
+  
+  # Configuration applicative
+  log.level: "info"
+  log.format: "json"
+  
+  # Configuration des métriques
+  metrics.enabled: "true"
+  metrics.port: "9090"
+  metrics.path: "/metrics"
+  
+  # Configuration du tracing
+  tracing.enabled: "true"
+  tracing.exporter: "otlp"
+  tracing.endpoint: "http://otel-collector.observability.svc.cluster.local:4318"
+  tracing.sample.rate: "0.1"
+  
+  # Configuration DLQ
+  dlq.max.retries: "3"
+  dlq.retry.base.delay: "1s"
+  dlq.retry.max.delay: "30s"
+  
+  # Fichier de configuration complet
+  config.yaml: |
+    version: "1.0"
+    environment: "kubernetes"
+    
+    kafka:
+      broker: "kafka-broker.kafka.svc.cluster.local:9092"
+      
+      topics:
+        orders: "orders"
+        orders_dlq: "orders-dlq"
+      
+      producer:
+        acks: "all"
+        retries: 3
+        compression_type: "snappy"
+        enable_idempotence: true
+      
+      consumer:
+        group_id: "order-tracker-group"
+        auto_offset_reset: "earliest"
+        enable_auto_commit: false
+    
+    dlq:
+      topic: "orders-dlq"
+      max_retries: 3
+      retry_base_delay: "1s"
+      retry_max_delay: "30s"
+    
+    monitoring:
+      metrics:
+        enabled: true
+        port: 9090
+      
+      tracing:
+        enabled: true
+        exporter: "otlp"
+        sample_rate: 0.1
+      
+      logging:
+        level: "info"
+        format: "json"
+    
+    http:
+      port: 8080
+      health:
+        enabled: true
+        path: "/health"
+      ready:
+        enabled: true
+        path: "/ready"
+
+---
+
+# Secret pour les credentials Kafka (à créer manuellement ou via un gestionnaire de secrets)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kafka-credentials
+  namespace: default
+  labels:
+    app: kafka-demo
+type: Opaque
+data:
+  # Ces valeurs sont en base64 - à remplacer par les vraies credentials
+  # echo -n 'username' | base64
+  username: dXNlcm5hbWU=
+  # echo -n 'password' | base64
+  password: cGFzc3dvcmQ=
+
+---
+
+# ConfigMap pour les dashboards Grafana
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-demo-grafana-dashboards
+  namespace: default
+  labels:
+    app: kafka-demo
+    grafana_dashboard: "1"
+data:
+  kafka-demo-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "Kafka Demo Dashboard",
+        "uid": "kafka-demo",
+        "panels": [
+          {
+            "title": "Messages Produced",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(kafka_producer_messages_total[5m]))"
+              }
+            ]
+          },
+          {
+            "title": "Messages Consumed",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(kafka_consumer_messages_total[5m]))"
+              }
+            ]
+          },
+          {
+            "title": "Consumer Lag",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "kafka_consumer_lag"
+              }
+            ]
+          },
+          {
+            "title": "DLQ Messages",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(kafka_dlq_messages_sent_total)"
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+---
+
+# HorizontalPodAutoscaler pour le consumer
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kafka-consumer-hpa
+  namespace: default
+  labels:
+    app: kafka-demo
+    component: consumer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kafka-consumer
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Scaling basé sur le lag Kafka (nécessite keda ou prometheus-adapter)
+    # - type: External
+    #   external:
+    #     metric:
+    #       name: kafka_consumer_lag
+    #       selector:
+    #         matchLabels:
+    #           topic: orders
+    #     target:
+    #       type: AverageValue
+    #       averageValue: "1000"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+
+---
+
+# PodDisruptionBudget pour haute disponibilité
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kafka-consumer-pdb
+  namespace: default
+  labels:
+    app: kafka-demo
+    component: consumer
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: kafka-demo
+      component: consumer

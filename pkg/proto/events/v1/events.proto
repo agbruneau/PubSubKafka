@@ -1,0 +1,194 @@
+// Package events.v1 defines the Protocol Buffer schemas for Kafka events.
+// 
+// This file contains the message definitions for order-related events
+// used in the PubSubKafka system.
+//
+// To regenerate Go code:
+//   protoc --go_out=. --go_opt=paths=source_relative events.proto
+
+syntax = "proto3";
+
+package events.v1;
+
+option go_package = "kafka-demo/pkg/proto/events/v1;eventsv1";
+
+import "google/protobuf/timestamp.proto";
+
+// OrderStatus represents the lifecycle state of an order.
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING = 1;
+  ORDER_STATUS_CONFIRMED = 2;
+  ORDER_STATUS_PROCESSING = 3;
+  ORDER_STATUS_SHIPPED = 4;
+  ORDER_STATUS_DELIVERED = 5;
+  ORDER_STATUS_CANCELLED = 6;
+  ORDER_STATUS_REFUNDED = 7;
+}
+
+// PaymentMethod represents supported payment types.
+enum PaymentMethod {
+  PAYMENT_METHOD_UNSPECIFIED = 0;
+  PAYMENT_METHOD_CREDIT_CARD = 1;
+  PAYMENT_METHOD_DEBIT_CARD = 2;
+  PAYMENT_METHOD_PAYPAL = 3;
+  PAYMENT_METHOD_BANK_TRANSFER = 4;
+  PAYMENT_METHOD_CRYPTO = 5;
+}
+
+// CustomerInfo contains customer details.
+message CustomerInfo {
+  string customer_id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string address = 5;
+  string loyalty_level = 6;
+}
+
+// OrderItem represents a single item in an order.
+message OrderItem {
+  string item_id = 1;
+  string item_name = 2;
+  int32 quantity = 3;
+  double unit_price = 4;
+  double total_price = 5;
+}
+
+// InventoryStatus represents stock information for an item.
+message InventoryStatus {
+  string item_id = 1;
+  string item_name = 2;
+  int32 available_qty = 3;
+  int32 reserved_qty = 4;
+  double unit_price = 5;
+  bool in_stock = 6;
+  string warehouse = 7;
+}
+
+// EventMetadata contains common event metadata.
+message EventMetadata {
+  google.protobuf.Timestamp timestamp = 1;
+  string version = 2;
+  string event_type = 3;
+  string source = 4;
+  string correlation_id = 5;
+  string trace_id = 6;
+  string span_id = 7;
+}
+
+// OrderEvent is the main event structure for order-related messages.
+message OrderEvent {
+  // Event metadata
+  EventMetadata metadata = 1;
+
+  // Order identification
+  string order_id = 2;
+  int32 sequence = 3;
+
+  // Order state
+  OrderStatus status = 4;
+  repeated OrderItem items = 5;
+
+  // Financial details
+  double sub_total = 6;
+  double tax = 7;
+  double shipping_fee = 8;
+  double total = 9;
+  string currency = 10;
+
+  // Payment and shipping
+  PaymentMethod payment_method = 11;
+  string shipping_address = 12;
+
+  // Related entities
+  CustomerInfo customer_info = 13;
+  repeated InventoryStatus inventory_status = 14;
+}
+
+// OrderCreatedEvent is emitted when a new order is created.
+message OrderCreatedEvent {
+  OrderEvent order = 1;
+}
+
+// OrderUpdatedEvent is emitted when an order is modified.
+message OrderUpdatedEvent {
+  OrderEvent order = 1;
+  repeated string updated_fields = 2;
+}
+
+// OrderStatusChangedEvent is emitted when order status changes.
+message OrderStatusChangedEvent {
+  string order_id = 1;
+  OrderStatus previous_status = 2;
+  OrderStatus new_status = 3;
+  google.protobuf.Timestamp changed_at = 4;
+  string reason = 5;
+}
+
+// OrderCancelledEvent is emitted when an order is cancelled.
+message OrderCancelledEvent {
+  string order_id = 1;
+  string reason = 2;
+  string cancelled_by = 3;
+  google.protobuf.Timestamp cancelled_at = 4;
+  double refund_amount = 5;
+}
+
+// DeadLetterEvent wraps a failed event for DLQ processing.
+message DeadLetterEvent {
+  // DLQ identification
+  string id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+
+  // Original message context
+  string original_topic = 3;
+  int32 original_partition = 4;
+  int64 original_offset = 5;
+  bytes original_key = 6;
+  bytes original_payload = 7;
+  google.protobuf.Timestamp original_timestamp = 8;
+
+  // Failure context
+  string failure_reason = 9;
+  string error_message = 10;
+  string error_stack = 11;
+  string consumer_group = 12;
+  string processing_host = 13;
+
+  // Retry metadata
+  int32 retry_count = 14;
+  google.protobuf.Timestamp first_failure = 15;
+  google.protobuf.Timestamp last_failure = 16;
+  google.protobuf.Timestamp next_retry_at = 17;
+  bool is_reprocessed = 18;
+
+  // Additional context
+  map<string, string> metadata = 19;
+}
+
+// UserEvent represents user-related events.
+message UserEvent {
+  EventMetadata metadata = 1;
+  string user_id = 2;
+  string action = 3;
+  map<string, string> properties = 4;
+}
+
+// UserRegisteredEvent is emitted when a new user registers.
+message UserRegisteredEvent {
+  string user_id = 1;
+  string email = 2;
+  string name = 3;
+  google.protobuf.Timestamp registered_at = 4;
+  string source = 5;
+}
+
+// UserLoginEvent is emitted when a user logs in.
+message UserLoginEvent {
+  string user_id = 1;
+  google.protobuf.Timestamp login_at = 2;
+  string ip_address = 3;
+  string user_agent = 4;
+  bool success = 5;
+}

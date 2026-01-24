@@ -1,0 +1,73 @@
+# ==============================================================================
+# PubSubKafka - Configuration Développement
+# ==============================================================================
+# Surcharge les valeurs par défaut pour l'environnement de développement local.
+
+# Version de la configuration
+version: "1.0"
+environment: "development"
+
+# ==============================================================================
+# Configuration Kafka
+# ==============================================================================
+kafka:
+  broker: "localhost:9092"
+  
+  producer:
+    message_interval: "2s"
+    retries: 1
+  
+  consumer:
+    group_id: "order-tracker-dev"
+
+# ==============================================================================
+# Configuration DLQ
+# ==============================================================================
+dlq:
+  max_retries: 2
+  retry_base_delay: "500ms"
+  retry_max_delay: "5s"
+
+# ==============================================================================
+# Configuration du Monitoring
+# ==============================================================================
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+  
+  tracing:
+    enabled: false
+  
+  logging:
+    level: "debug"
+    format: "text"
+    output: "stdout"
+
+# ==============================================================================
+# Configuration du Serveur HTTP
+# ==============================================================================
+http:
+  port: 8080
+
+# ==============================================================================
+# Configuration de la Base de Données
+# ==============================================================================
+database:
+  host: "localhost"
+  port: 5432
+  name: "kafka_events_dev"
+  user: "postgres"
+  password: "postgres"
+  ssl_mode: "disable"
+  max_open_conns: 5
+  max_idle_conns: 2
+
+# ==============================================================================
+# Configuration de Sécurité
+# ==============================================================================
+security:
+  sasl:
+    enabled: false
+  tls:
+    enabled: false

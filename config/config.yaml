@@ -1,0 +1,132 @@
+# ==============================================================================
+# PubSubKafka - Configuration par défaut
+# ==============================================================================
+# Ce fichier contient la configuration de base du système.
+# Les fichiers spécifiques à l'environnement (dev.yaml, staging.yaml, prod.yaml)
+# peuvent surcharger ces valeurs.
+
+# Version de la configuration
+version: "1.0"
+
+# ==============================================================================
+# Configuration Kafka
+# ==============================================================================
+kafka:
+  # Adresse du broker Kafka
+  broker: "localhost:9092"
+  
+  # Topics
+  topics:
+    orders: "orders"
+    orders_dlq: "orders-dlq"
+    users: "users"
+    users_dlq: "users-dlq"
+  
+  # Configuration du Producer
+  producer:
+    acks: "all"                    # Niveau d'acquittement (all, 1, 0)
+    retries: 3                      # Nombre de tentatives en cas d'échec
+    batch_size: 16384               # Taille du batch en octets
+    linger_ms: 5                    # Délai avant envoi d'un batch
+    compression_type: "snappy"      # Type de compression (none, gzip, snappy, lz4, zstd)
+    enable_idempotence: true        # Livraison exactement une fois
+    message_interval: "2s"          # Intervalle entre les messages
+    flush_timeout: "15s"            # Timeout pour le flush
+  
+  # Configuration du Consumer
+  consumer:
+    group_id: "order-tracker-group" # Identifiant du groupe de consommateurs
+    auto_offset_reset: "earliest"   # Position de départ (earliest, latest)
+    enable_auto_commit: false       # Commit manuel pour at-least-once
+    auto_commit_interval: "5s"      # Intervalle de commit automatique
+    session_timeout: "30s"          # Timeout de session
+    heartbeat_interval: "3s"        # Intervalle de heartbeat
+    max_poll_records: 500           # Nombre max de records par poll
+    read_timeout: "1s"              # Timeout de lecture
+
+# ==============================================================================
+# Configuration DLQ (Dead Letter Queue)
+# ==============================================================================
+dlq:
+  topic: "orders-dlq"
+  max_retries: 3
+  retry_base_delay: "1s"
+  retry_max_delay: "30s"
+  flush_timeout: "5s"
+
+# ==============================================================================
+# Configuration du Monitoring
+# ==============================================================================
+monitoring:
+  # Métriques Prometheus
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+  
+  # Tracing OpenTelemetry
+  tracing:
+    enabled: false
+    exporter: "jaeger"              # jaeger, zipkin, otlp
+    endpoint: "http://localhost:14268/api/traces"
+    sample_rate: 1.0                # Taux d'échantillonnage (0.0 - 1.0)
+  
+  # Logging
+  logging:
+    level: "info"                   # debug, info, warn, error
+    format: "json"                  # json, text
+    output: "stdout"                # stdout, file
+    file_path: ""                   # Chemin du fichier de log
+
+# ==============================================================================
+# Configuration du Serveur HTTP
+# ==============================================================================
+http:
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  shutdown_timeout: "10s"
+  
+  # Health checks
+  health:
+    enabled: true
+    path: "/health"
+  
+  # Readiness probe
+  ready:
+    enabled: true
+    path: "/ready"
+
+# ==============================================================================
+# Configuration de la Base de Données (Event Store)
+# ==============================================================================
+database:
+  driver: "postgres"
+  host: "localhost"
+  port: 5432
+  name: "kafka_events"
+  user: "postgres"
+  password: ""                      # À définir via variable d'environnement
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+
+# ==============================================================================
+# Configuration de Sécurité
+# ==============================================================================
+security:
+  # Authentification Kafka SASL
+  sasl:
+    enabled: false
+    mechanism: "PLAIN"              # PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+    username: ""
+    password: ""
+  
+  # TLS/SSL
+  tls:
+    enabled: false
+    ca_file: ""
+    cert_file: ""
+    key_file: ""
+    skip_verify: false
